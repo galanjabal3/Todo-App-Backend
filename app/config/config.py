@@ -1,0 +1,9 @@
+import os
+
+PROVIDER = os.getenv("provider")
+USER = os.getenv("user")
+PASSWORD = os.getenv("password")
+HOST = os.getenv("host")
+PORT = os.getenv("port")
+DBNAME = os.getenv("dbname")
+ENVIRONMENT = os.getenv("environment")

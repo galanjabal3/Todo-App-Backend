@@ -1,0 +1,9 @@
+falcon
+pony
+gunicorn
+psycopg2
+rich
+python-dotenv
+pydantic
+pydantic[email]
+spectree
