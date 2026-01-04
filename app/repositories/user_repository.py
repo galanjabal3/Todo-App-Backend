@@ -7,6 +7,7 @@ class UserRepository(BaseRepository):
     # Mapping filter fields:
     # q = Query object, v = Value input, t = Table entity
     filter_map = {
-        "id": lambda x, v: x.filter(lambda t: t.id == v),
-        "email": lambda x, v: x.filter(lambda t: t.email == v),
+        **BaseRepository.filter_map,
+        "email": lambda x, v: x.filter(lambda t: t.email.lower() == v),
+        "username": lambda x, v: x.filter(lambda t: t.username.lower() == v),
     }

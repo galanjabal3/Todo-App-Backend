@@ -1,5 +1,5 @@
 import math
-from pony.orm import db_session, select
+from pony.orm import db_session, select, desc
 from app.utils.logger import logger
 
 class BaseRepository:
@@ -12,8 +12,11 @@ class BaseRepository:
     """
     entity = None
     
-    # mapping field → handler
-    filter_map = {}
+    # mapping field to filter → handler
+    filter_map = {
+        "id": lambda x, v: x.filter(lambda t: str(t.id) == v),
+        "is_deleted": lambda x, v: x.filter(lambda t: t.is_deleted == v),
+    }
     
     def __init__(self):
         """
@@ -25,7 +28,7 @@ class BaseRepository:
             )
         
             
-    def apply_filters(self, query, filters):
+    def apply_query_options(self, query, filters, order_by=None):
         """
         Apply filters to a query.
 
@@ -37,9 +40,15 @@ class BaseRepository:
             The filtered query.
         """
         try:
-            if filters is None or not filters:
-                return query
+            filters = filters or []
+            
+            # Default soft delete
+            if not any(f.get("field") == "is_deleted" for f in filters):
+                handler = self.filter_map.get("is_deleted")
+                if handler:
+                    query = handler(query, False)
 
+            # Apply filters
             for f in filters:
                 field = f.get("field")
                 value = f.get("value")
@@ -47,11 +56,20 @@ class BaseRepository:
                 handler = self.filter_map.get(field)
                 if handler:
                     query = handler(query, value)
+            
+            # Apply ordering
+            if order_by:
+                descending = order_by.startswith("-")
+                field_name = order_by.lstrip("-")
 
+                field = getattr(self.entity, field_name)
+                if field:
+                    query = query.order_by(desc(field) if descending else field)
+            
             return query
         except Exception as e:
-            logger.error(f"Error in apply_filters: {e}", exc_info=e)
-            raise e
+            logger.error(f"Error in apply_query_options: {e}", exc_info=e)
+            raise
 
     @db_session
     def get_by_id(self, id):
@@ -68,13 +86,13 @@ class BaseRepository:
             Exception: If an error occurs during retrieval.
         """
         try:
-            return self.entity.get(id=id)
+            return self.entity.get(id=id, is_deleted=False)
         except Exception as e:
             logger.error(f"Error in get_by_id: {e}", exc_info=e)
-            raise e
+            raise
 
     @db_session
-    def get_all_with_filters_and_pagination(self, filters=None, page=1, limit=10):
+    def get_all_with_filters_and_pagination(self, filters=None, page=1, limit=10, order_by="-created_at"):
         """
         Retrieve all entities with filters and pagination.
 
@@ -82,6 +100,7 @@ class BaseRepository:
             filters: A list of filters to apply.
             page: The page number for pagination.
             limit: The number of entities per page.
+            order_by: Field name to sort by, prefixed with "-" for descending order. 
 
         Returns:
             A tuple containing the filtered entities and pagination details.
@@ -93,7 +112,7 @@ class BaseRepository:
             if filters is None:
                 filters = []
             query = select(e for e in self.entity)
-            query = self.apply_filters(query, filters)
+            query = self.apply_query_options(query, filters, order_by)
             
             # Paginate
             page = max(page, 1)
@@ -138,11 +157,11 @@ class BaseRepository:
             if filters is None:
                 filters = []
             query = select(e for e in self.entity)
-            query = self.apply_filters(query, filters).first()
-            return query
+            query = self.apply_query_options(query, filters)
+            return (query[:1] or [None])[0]
         except Exception as e:
             logger.error(f"Error in get_one_by_filters: {e}", exc_info=e)
-            raise e
+            raise
 
     @db_session
     def create(self, data: dict):
@@ -159,13 +178,14 @@ class BaseRepository:
             Exception: If an error occurs during creation.
         """
         try:
-            return self.entity(**data)
+            entity_obj = self.entity(**data)
+            return entity_obj.to_dict(with_collections=True) 
         except Exception as e:
             logger.error(f"Error in create: {e}", exc_info=e)
-            raise e
+            raise
 
     @db_session
-    def udpate(self, data: dict):
+    def update(self, data: dict):
         """
         Update an existing entity.
 
@@ -179,18 +199,43 @@ class BaseRepository:
             Exception: If an error occurs during update.
         """
         try:
-            obj = self.get_by_id(data.get("id"))
-            if not obj:
+            entity_obj = self.get_by_id(data.get("id"))
+            if not entity_obj:
                 return None
             
-            obj.set(**data)
-            return obj
+            entity_obj.set(**data)
+            return entity_obj.to_dict(with_collections=True)
         except Exception as e:
-            logger.error(f"Error in udpate: {e}", exc_info=e)
-            raise e
+            logger.error(f"Error in update: {e}", exc_info=e)
+            raise
+    
+    @db_session
+    def update_one_with_filters(self, filters=None, data: dict = {}):
+        """
+        Update an existing entity with fitlers.
+
+        Args:
+            data: The updated data for the entity with fitlers.
+
+        Returns:
+            The updated entity, or None if the entity does not exist.
+
+        Raises:
+            Exception: If an error occurs during update.
+        """
+        try:
+            entity_obj = self.get_one_by_filters(filters)
+            if not entity_obj:
+                return None
+            
+            entity_obj.set(**data)
+            return entity_obj.to_dict(with_collections=True)
+        except Exception as e:
+            logger.error(f"Error in update_one_with_filters: {e}", exc_info=e)
+            raise
 
     @db_session
-    def delete(self, id, soft_delete=True):
+    def delete_by_id(self, id, soft_delete=True):
         """
         Delete an entity by its ID.
 
@@ -212,7 +257,7 @@ class BaseRepository:
                 else:
                     obj.is_deleted = True
             
-            return obj
+            return True
         except Exception as e:
-            logger.error(f"Error in delete: {e}", exc_info=e)
-            raise e
+            logger.error(f"Error in delete_by_id: {e}", exc_info=e)
+            raise

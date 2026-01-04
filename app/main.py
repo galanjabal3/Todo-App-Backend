@@ -5,21 +5,31 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.config.config import ENVIRONMENT
-from app.utils.logger import logger
+from app.config.spectree import api_spec
 from app.utils.error_handlers import register_error_handlers
+from app.utils.logger import logger
+from app.routes.core import register_routes
+from app.db.database import init_db
+from app.middlewares.jwt_middleware import JWTMiddleware
 
-# Resource Entities
-from app.resources.base import spec
-from app.resources.user_resource import UserResource
 
-app = falcon.App()
+def create_app():
+    # Initialize Database
+    init_db()
 
-# Register error handlers
-register_error_handlers(app)
+    app = falcon.App(middleware=[
+        JWTMiddleware(),
+    ])
 
-app.add_route("/test", UserResource())
+    register_error_handlers(app) # Register error handlers
+    register_routes(app) # Register Routes
+    
+    if ENVIRONMENT == "develop":
+        api_spec.register(app) # Register app with SpecTree to generate Swagger
 
-# Register your app with SpecTree to generate Swagger.
-spec.register(app)
+    logger.info("[STARTUP] Todo App Backend is starting in %s environment", ENVIRONMENT.capitalize())
+    
+    return app
 
-logger.info("[STARTUP] Todo App Backend is starting in %s environment", ENVIRONMENT.capitalize())
+
+app = create_app()

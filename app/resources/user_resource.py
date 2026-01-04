@@ -1,15 +1,50 @@
-import falcon
-from app.resources.base import BaseResource, spec, Response, generate_filters_resource
+from app.resources.base import api_spec, Response, BaseResource, generate_filters_resource
 from app.services.user_service import UserService
-from app.schemas.user_schema import UserResponseSpecTree
+from app.schemas.user_schema import UserFilter, UserPublicResponseResource, UserPublicResponse, UserUpdate, ListUserPublicResponseResource
 
-class UserResource(BaseResource):
+class BaseUserResource(BaseResource):
     def __init__(self):
         self.service = UserService()
+        
+class UsersResource(BaseUserResource):
 
-    @spec.validate(resp=Response(HTTP_200=UserResponseSpecTree))
+    @api_spec.validate(
+        query=UserFilter,
+        resp=Response(HTTP_200=ListUserPublicResponseResource),
+        tags=["User"]
+    )
     def on_get(self, req, resp):
-        filters = generate_filters_resource(req, params_string=["email"])
-        self.resource_response(resp=resp, data=self.service.get_all_with_filters(filters=filters))
+        filters = generate_filters_resource(req, params_string=["email", "username"])
+        page = req.get_param("page", default=1, required=False)
+        limit = req.get_param("limit", default=100, required=False)
         
+        data, pagination = self.service.get_all_with_filters_and_pagination(
+            page=page,
+            limit=limit,
+            filters=filters,
+            schema_response=UserPublicResponse
+        )
+        self.resource_response(resp=resp, data=data, pagination=pagination)
+
+class UserProfileResource(BaseUserResource):
+
+    @api_spec.validate(
+        resp=Response(HTTP_200=UserPublicResponseResource),
+        tags=["User"]
+    )
+    def on_get(self, req, resp):
+        self.resource_response(resp=resp, data=self.service.get_one_by_filters(filters={
+            "id": req.context["user"]["id"]
+        }, schema_response=UserPublicResponse))
+    
+    @api_spec.validate(
+        json=UserUpdate,
+        resp=Response(HTTP_200=UserPublicResponseResource),
+        tags=["User"]
+    )
+    def on_put(self, req, resp):
+        usr_id = req.context["user"]["id"]
         
+        payload = req.media
+        payload["id"] = usr_id
+        self.resource_response(resp=resp, data=self.service.update_one_with_filters(filters={"id": usr_id}, data=payload))

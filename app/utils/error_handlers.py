@@ -1,10 +1,10 @@
 import traceback
 import falcon
-import os
 import uuid
+from pydantic import ValidationError
+from app.config.config import ENVIRONMENT
 from app.utils.logger import logger
 
-ENV = os.getenv("environment", None)
 
 def generic_error_handler(req, resp, ex, params):
     """Catch-all error handler for unexpected exceptions."""
@@ -20,7 +20,7 @@ def generic_error_handler(req, resp, ex, params):
     logger.error(f"[{error_id}] Unhandled exception", exc_info=ex)
 
     # For LOCAL (developer mode)
-    if ENV == "develop":
+    if ENVIRONMENT == "develop":
         tb_list = traceback.format_exception(type(ex), ex, ex.__traceback__)
         traceback_clean = [line.rstrip("\n") for line in tb_list]
 
@@ -51,5 +51,5 @@ def handle_404(req, resp, ex, params):
 
 
 def register_error_handlers(app):
-    app.add_error_handler(Exception, generic_error_handler)
     app.add_error_handler(falcon.HTTPNotFound, handle_404)
+    app.add_error_handler(Exception, generic_error_handler)

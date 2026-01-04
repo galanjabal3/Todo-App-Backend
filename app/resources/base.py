@@ -1,16 +1,35 @@
 import falcon
 import json
+from pydantic import ValidationError
 from itertools import chain
-from spectree import SpecTree, Response
+from app.config.spectree import api_spec, Response
+from app.utils.logger import logger
 
-# Inisialisasi SpecTree
-spec = SpecTree("falcon", title="My API", version="1.0.0")
+
+class HealthResource:
+    skip_auth = True
+    
+    @api_spec.validate(security=[])
+    def on_get(self, req, resp):
+        resp.media = {"status": "OK"}
 
 class BaseResource:
-    def resource_response(self, resp, success=True, message="Success", data=None, pagination=None, status=falcon.HTTP_200, metadata=None):
+    def parse_body(self, req, schema):
+        try:
+            data = schema(**req.media)
+            return data.model_dump()  # ✅ Pydantic v2
+        except ValidationError as e:
+            logger.error(f"Err in parse_body: {e}")
+            raise falcon.HTTPBadRequest(
+                title="Validation error",
+                description=e.errors(),
+            )
+    
+    def resource_response(self, resp, message="Success", data=None, pagination=None, status=falcon.HTTP_200, metadata=None):
         resp.status = status
         resp.media = {
-            "success": success,
+            "code": resp.status_code,
+            "status": status,
             "message": message,
             "data": data,
         }

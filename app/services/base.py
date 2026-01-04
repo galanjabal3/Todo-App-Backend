@@ -1,6 +1,7 @@
 from typing import Type
 from pydantic import BaseModel
 from app.utils.logger import logger
+from app.utils.other import list_filter_dict_to_list
 
 class BaseService:
     """
@@ -29,8 +30,11 @@ class BaseService:
         
         if not self.repo:
             raise ValueError("Repository must be provided")
+    
+    def format_filters(self, filters=None):
+        return filters if isinstance(filters, list) else list_filter_dict_to_list(filters=filters or [])
 
-    def get_all_with_filters_and_pagination(self, filters=[], page=1, limit=10, to_response="to_response"):
+    def get_all_with_filters_and_pagination(self, filters=[], page=1, limit=10, schema_response=None):
         """
         Retrieve all records with filters and pagination.
 
@@ -47,34 +51,45 @@ class BaseService:
             Exception: If an error occurs during data retrieval.
         """
         try:
-            datas, pagination = self.repo.get_all_with_filters_and_pagination(filters=filters, page=page, limit=limit)
-            if datas:
-                datas = [self.schema.from_orm(x).model_dump() for x in datas]
+            datas, pagination = self.repo.get_all_with_filters_and_pagination(
+                filters=filters,
+                page=page,
+                limit=limit
+            )
+            
+            schema = schema_response or self.schema
+
+            if schema:
+                datas = [
+                    schema.from_orm(obj).model_dump()
+                    for obj in datas
+                ]
             
             return datas, pagination
         except Exception as e:
             logger.error(f"Err in get_all_with_filters_and_pagination: {e}", exc_info=e)
-            raise e
+            raise
 
-    def get_all_with_filters(self, filters=[]):
+    def get_all_with_filters(self, filters=None, schema_response=None):
         """
         Retrieve all records with filters.
 
         Args:
-            filters: A list of filters to apply.
+            filters: A list/dict of filters to apply.
 
         Returns:
-            A list of filtered data.
+            A list/dict of filtered data.
 
         Raises:
             Exception: If an error occurs during data retrieval.
         """
         try:
-            datas, _ = self.get_all_with_filters_and_pagination(filters=filters)
+            filters = self.format_filters(filters)
+            datas, _ = self.get_all_with_filters_and_pagination(filters=filters, schema_response=schema_response)
             return datas
         except Exception as e:
             logger.error(f"Err in get_all_with_filters: {e}", exc_info=e)
-            raise e
+            raise
 
     def get_by_id(self, id):
         """
@@ -93,14 +108,14 @@ class BaseService:
             return self.repo.get_by_id(id)
         except Exception as e:
             logger.error(f"Err in get_by_id: {e}", exc_info=e)
-            raise e
+            raise
 
-    def get_one_by_filters(self, filters=[]):
+    def get_one_by_filters(self, filters=None, to_model=False, schema_response=None):
         """
         Retrieve a single record matching the filters.
 
         Args:
-            filters: A list of filters to apply.
+            filters: A list/dict of filters to apply.
 
         Returns:
             The record matching the filters.
@@ -109,10 +124,22 @@ class BaseService:
             Exception: If an error occurs during data retrieval.
         """
         try:
-            return self.repo.get_one_by_filters(filters)
+            filters = self.format_filters(filters)
+            datas = self.repo.get_one_by_filters(filters)
+            if not datas:
+                return None
+            
+            if to_model:
+                return datas
+            
+            schema = schema_response or self.schema
+            if schema:
+                datas = schema.from_orm(datas).model_dump()
+            
+            return datas
         except Exception as e:
             logger.error(f"Err in get_one_by_filters: {e}", exc_info=e)
-            raise e
+            raise
 
     def create(self, data):
         """
@@ -128,10 +155,12 @@ class BaseService:
             Exception: If an error occurs during record creation.
         """
         try:
-            return self.repo.create(data)
+            new_record = self.repo.create(data)
+            validated_data = self.schema.model_validate(new_record)
+            return validated_data.model_dump()
         except Exception as e:
             logger.error(f"Err in create: {e}", exc_info=e)
-            raise e
+            raise
 
     def update(self, data):
         """
@@ -147,12 +176,37 @@ class BaseService:
             Exception: If an error occurs during record update.
         """
         try:
-            return self.repo.update(data)
+            datas = self.repo.update(data)
+            return self.schema.from_orm(datas).model_dump()
         except Exception as e:
             logger.error(f"Err in update: {e}", exc_info=e)
-            raise e
+            raise
+    
+    def update_one_with_filters(self, filters=None, data: dict = {}):
+        """
+        Update an existing record.
 
-    def delete(self, id, soft_delete=True):
+        Args:
+            data: The updated data for the record.
+
+        Returns:
+            The updated record.
+
+        Raises:
+            Exception: If an error occurs during record update.
+        """
+        try:
+            filters = self.format_filters(filters)
+            datas = self.repo.update_one_with_filters(filters, data)
+            if not datas:
+                return datas
+
+            return self.schema.from_orm(datas).model_dump()
+        except Exception as e:
+            logger.error(f"Err in update_one_with_filters: {e}", exc_info=e)
+            raise
+
+    def delete_by_id(self, id, soft_delete=True):
         """
         Delete a record by its ID.
 
@@ -167,7 +221,7 @@ class BaseService:
             Exception: If an error occurs during record deletion.
         """
         try:
-            return self.repo.delete(id, soft_delete=soft_delete)
+            return self.repo.delete_by_id(id, soft_delete=soft_delete)
         except Exception as e:
-            logger.error(f"Err in delete: {e}", exc_info=e)
-            raise e
+            logger.error(f"Err in delete_by_id: {e}", exc_info=e)
+            raise
