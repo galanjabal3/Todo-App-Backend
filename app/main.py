@@ -11,6 +11,7 @@ from app.utils.logger import logger
 from app.routes.core import register_routes
 from app.db.database import init_db
 from app.middlewares.jwt_middleware import JWTMiddleware
+from app.middlewares.cors_middleware import CORSMiddleware
 
 
 def create_app():
@@ -18,6 +19,7 @@ def create_app():
     init_db()
 
     app = falcon.App(middleware=[
+        CORSMiddleware(),
         JWTMiddleware(),
     ])
 
