@@ -1,0 +1,61 @@
+from app.resources.base import api_spec, Response, BaseResource
+from app.services.group_service import GroupService
+from app.schemas.group import *
+
+class BaseGroupResource(BaseResource):
+    def __init__(self):
+        self.service = GroupService()
+        
+class GroupsResource(BaseGroupResource):
+
+    @api_spec.validate(
+        query=GroupFilter,
+        resp=Response(HTTP_200=ListGroupResponseResource),
+        tags=["Group"]
+    )
+    def on_get(self, req, resp):
+        filters = self.generate_filters_resource(req, params_string=["name"])
+        page = req.get_param_as_int("page", default=1, required=False)
+        limit = req.get_param_as_int("limit", default=100, required=False)
+        
+        data, pagination = self.service.get_all_with_filters_and_pagination(
+            page=page,
+            limit=limit,
+            filters=filters,
+        )
+        self.resource_response(resp=resp, data=data, pagination=pagination)
+    
+    @api_spec.validate(
+        json=GroupPayload,
+        resp=Response(HTTP_200=GroupResponseResource),
+        tags=["Group"]
+    )
+    def on_post(self, req, resp):
+        body = self.parse_body(req, GroupPayload)
+        self.resource_response(resp=resp, data=self.service.create(body))
+
+class GroupsWithIdResource(BaseGroupResource):
+
+    @api_spec.validate(
+        resp=Response(HTTP_200=GroupResponseResource),
+        tags=["Group"]
+    )
+    def on_get(self, req, resp, id: str):
+        self.resource_response(resp=resp, data=self.service.get_by_id(id=id))
+    
+    @api_spec.validate(
+        json=GroupPayload,
+        resp=Response(HTTP_200=GroupResponseResource),
+        tags=["Group"]
+    )
+    def on_put(self, req, resp, id: str):
+        body = self.parse_body(req, GroupPayload)
+        body["id"] = id
+        self.resource_response(resp=resp, data=self.service.update(body))
+    
+    @api_spec.validate(
+        resp=Response(HTTP_200=DeleteResponse),
+        tags=["Group"]
+    )
+    def on_delete(self, req, resp, id: str):
+        self.resource_response(resp=resp, data=self.service.delete_by_id(id=id))

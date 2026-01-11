@@ -1,20 +1,21 @@
-from typing import Type
-from pydantic import BaseModel
+from typing import TypeVar, Generic, Optional
 from app.utils.logger import logger
 from app.utils.other import list_filter_dict_to_list
+from app.utils.http_exceptions import not_found, unauthorized, conflict
+from app.repositories.base import BaseRepositoryProtocol
 
-class BaseService:
+TRepo = TypeVar("TRepo", bound=BaseRepositoryProtocol)
+
+class BaseService(Generic[TRepo]):
     """
     BaseService provides a generic service layer for interacting with repositories and schemas.
 
     Attributes:
         repository: The default repository to be used by the service.
-        schema_class: The default schema class to be used for data serialization/deserialization.
     """
-    repository = None
-    schema_class = None
+    repository: Optional[TRepo] = None
 
-    def __init__(self, repository=None, schema_class: Type[BaseModel] = None):
+    def __init__(self, repository: Optional[TRepo] = None):
         """
         Initialize the BaseService with a repository and schema class.
 
@@ -25,11 +26,13 @@ class BaseService:
         Raises:
             ValueError: If no repository is provided.
         """
-        self.repo = repository or self.repository
-        self.schema = schema_class or self.schema_class
-        
+        self.repo: TRepo = repository or self.repository
         if not self.repo:
             raise ValueError("Repository must be provided")
+    
+    @property
+    def entity_name(self):
+        return self.repo.entity_label
     
     def format_filters(self, filters=None):
         return filters if isinstance(filters, list) else list_filter_dict_to_list(filters=filters or [])
@@ -54,16 +57,9 @@ class BaseService:
             datas, pagination = self.repo.get_all_with_filters_and_pagination(
                 filters=filters,
                 page=page,
-                limit=limit
+                limit=limit,
+                schema_response=schema_response
             )
-            
-            schema = schema_response or self.schema
-
-            if schema:
-                datas = [
-                    schema.from_orm(obj).model_dump()
-                    for obj in datas
-                ]
             
             return datas, pagination
         except Exception as e:
@@ -91,7 +87,7 @@ class BaseService:
             logger.error(f"Err in get_all_with_filters: {e}", exc_info=e)
             raise
 
-    def get_by_id(self, id):
+    def get_by_id(self, id=None, to_model=False, schema_response=None):
         """
         Retrieve a record by its ID.
 
@@ -105,7 +101,7 @@ class BaseService:
             Exception: If an error occurs during data retrieval.
         """
         try:
-            return self.repo.get_by_id(id)
+            return self.repo.get_by_id(id, to_model=to_model, schema_response=schema_response)
         except Exception as e:
             logger.error(f"Err in get_by_id: {e}", exc_info=e)
             raise
@@ -125,16 +121,9 @@ class BaseService:
         """
         try:
             filters = self.format_filters(filters)
-            datas = self.repo.get_one_by_filters(filters)
+            datas = self.repo.get_one_by_filters(filters, to_model=to_model, schema_response=schema_response)
             if not datas:
                 return None
-            
-            if to_model:
-                return datas
-            
-            schema = schema_response or self.schema
-            if schema:
-                datas = schema.from_orm(datas).model_dump()
             
             return datas
         except Exception as e:
@@ -156,7 +145,7 @@ class BaseService:
         """
         try:
             new_record = self.repo.create(data)
-            validated_data = self.schema.model_validate(new_record)
+            validated_data = self.repo.schema.model_validate(new_record)
             return validated_data.model_dump()
         except Exception as e:
             logger.error(f"Err in create: {e}", exc_info=e)
@@ -177,7 +166,7 @@ class BaseService:
         """
         try:
             datas = self.repo.update(data)
-            return self.schema.from_orm(datas).model_dump()
+            return self.repo.schema.model_validate(datas).model_dump()
         except Exception as e:
             logger.error(f"Err in update: {e}", exc_info=e)
             raise
@@ -201,7 +190,7 @@ class BaseService:
             if not datas:
                 return datas
 
-            return self.schema.from_orm(datas).model_dump()
+            return self.repo.schema.model_validate(datas).model_dump()
         except Exception as e:
             logger.error(f"Err in update_one_with_filters: {e}", exc_info=e)
             raise
@@ -221,6 +210,13 @@ class BaseService:
             Exception: If an error occurs during record deletion.
         """
         try:
+            datas = self.get_by_id(id=id)
+            if not datas:
+                not_found(
+                    title=f"{self.entity_name} not found",
+                    msg=f"{self.entity_name} with id '{id}' does not exist"
+                )
+            
             return self.repo.delete_by_id(id, soft_delete=soft_delete)
         except Exception as e:
             logger.error(f"Err in delete_by_id: {e}", exc_info=e)

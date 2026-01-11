@@ -1,16 +1,59 @@
 import math
+from typing import Type, Protocol, Optional
+from pydantic import BaseModel
 from pony.orm import db_session, select, desc
 from app.utils.logger import logger
 
+
+# -------------------------------
+# Protocol (type hint / interface)
+# -------------------------------
+class BaseRepositoryProtocol(Protocol):
+    """
+    Protocol for repository type hinting and IDE autocomplete.
+    This defines the "contract" that concrete repositories must follow.
+    """
+
+    # runtime attributes every repository should have
+    entity: object                 # ORM model / database entity
+    schema_class: Optional[Type[BaseModel]]  # Pydantic schema for serialization/deserialization
+
+    # Example generic methods every repository should implement
+    def __init__(self, schema_class: Optional[Type[BaseModel]] = None): ...
+    
+    def entity_label(self) -> str: ...
+    
+    def apply_query_options(self, query, filters, order_by=None): ...
+    
+    def get_by_id(self, id): ...
+    
+    def get_all_with_filters_and_pagination(self, filters=None, page=1, limit=10, order_by="-created_at", to_model=False,  schema_response=None): ...
+    
+    def get_one_by_filters(self, filters=None, to_model=False, schema_response=None): ...
+    
+    def create(self, data: dict): ...
+    
+    def update(self, data: dict): ...
+    
+    def update_one_with_filters(self, filters=None, data: dict = {}): ...
+    
+    def delete_by_id(self, id, soft_delete=True): ...
+    
+
+# -------------------------------
+# BaseRepository (runtime)
+# -------------------------------
 class BaseRepository:
     """
     BaseRepository provides a generic repository layer for interacting with the database.
 
     Attributes:
         entity: The database entity (model) associated with this repository.
+        schema_class: The default schema class to be used for data serialization/deserialization.
         filter_map: A mapping of fields to their respective filter handlers.
     """
-    entity = None
+    entity: None
+    schema_class = Type[BaseModel]
     
     # mapping field to filter → handler
     filter_map = {
@@ -18,16 +61,21 @@ class BaseRepository:
         "is_deleted": lambda x, v: x.filter(lambda t: t.is_deleted == v),
     }
     
-    def __init__(self):
+    def __init__(self, schema_class: Type[BaseModel] = None):
         """
         Initialize the BaseRepository.
         """
+        self.schema = schema_class or self.schema_class
         if self.entity is None:
             raise NotImplementedError(
                 "Repository must define entity"
             )
-        
-            
+    
+    @property
+    def entity_label(self) -> str:
+        name = self.entity.__name__ if self.entity else self.__class__.__name__
+        return name.replace("DB", "").replace("Model", "")
+
     def apply_query_options(self, query, filters, order_by=None):
         """
         Apply filters to a query.
@@ -72,7 +120,7 @@ class BaseRepository:
             raise
 
     @db_session
-    def get_by_id(self, id):
+    def get_by_id(self, id, to_model=False, schema_response=None):
         """
         Retrieve an entity by its ID.
 
@@ -86,13 +134,25 @@ class BaseRepository:
             Exception: If an error occurs during retrieval.
         """
         try:
-            return self.entity.get(id=id, is_deleted=False)
+            filters = {"id": id}
+            if hasattr(self.entity, "is_deleted"):
+                filters["is_deleted"] = False
+
+            query = self.entity.get(**filters)
+            if to_model:
+                return query
+            
+            schema = schema_response or self.schema
+            if schema and query is not None:
+                query = schema.model_validate(query).model_dump()
+            
+            return query
         except Exception as e:
             logger.error(f"Error in get_by_id: {e}", exc_info=e)
             raise
 
     @db_session
-    def get_all_with_filters_and_pagination(self, filters=None, page=1, limit=10, order_by="-created_at"):
+    def get_all_with_filters_and_pagination(self, filters=None, page=1, limit=10, order_by="created_at", to_model=False,  schema_response=None):
         """
         Retrieve all entities with filters and pagination.
 
@@ -111,18 +171,31 @@ class BaseRepository:
         try:
             if filters is None:
                 filters = []
+            
             query = select(e for e in self.entity)
             query = self.apply_query_options(query, filters, order_by)
             
             # Paginate
             page = max(page, 1)
-            limit = max(limit, 1)
+            if limit <= 0:
+                items = query[:]
+                total = len(query) if hasattr(query, '__len__') else query.count()
+                total_pages = 1
+            else:
+                limit = max(limit, 1)
+                total = query.count()
+                total_pages = math.ceil(total / limit)
 
-            total = query.count()
-            total_pages = math.ceil(total / limit)
+                offset = (page - 1) * limit
+                items = query[offset: offset + limit]
+            
+            schema = schema_response or self.schema
 
-            offset = (page - 1) * limit
-            items = query[offset: offset + limit]
+            if schema and not to_model:
+                items = [
+                    schema.model_validate(obj).model_dump()
+                    for obj in items
+                ]
             
             return items, {
                 "page": page,
@@ -140,7 +213,7 @@ class BaseRepository:
             }
     
     @db_session
-    def get_one_by_filters(self, filters=None):
+    def get_one_by_filters(self, filters=None, to_model=False, schema_response=None):
         """
         Retrieve a single entity matching the filters.
 
@@ -156,9 +229,21 @@ class BaseRepository:
         try:
             if filters is None:
                 filters = []
+            
+            # Build query
             query = select(e for e in self.entity)
             query = self.apply_query_options(query, filters)
-            return (query[:1] or [None])[0]
+
+            result = query.first()
+
+            if to_model:
+                return result
+
+            schema = schema_response or self.schema
+            if schema and result is not None:
+                result = schema.model_validate(result).model_dump()
+
+            return result
         except Exception as e:
             logger.error(f"Error in get_one_by_filters: {e}", exc_info=e)
             raise
@@ -179,7 +264,7 @@ class BaseRepository:
         """
         try:
             entity_obj = self.entity(**data)
-            return entity_obj.to_dict(with_collections=True) 
+            return entity_obj.to_dict(with_collections=True)
         except Exception as e:
             logger.error(f"Error in create: {e}", exc_info=e)
             raise
@@ -199,12 +284,17 @@ class BaseRepository:
             Exception: If an error occurs during update.
         """
         try:
-            entity_obj = self.get_by_id(data.get("id"))
+            entity_obj = self.get_by_id(data.get("id"), to_model=True)
             if not entity_obj:
                 return None
             
             entity_obj.set(**data)
-            return entity_obj.to_dict(with_collections=True)
+            result = entity_obj
+            
+            if self.schema and result is not None:
+                result = self.schema.model_validate(result).model_dump()
+            
+            return result
         except Exception as e:
             logger.error(f"Error in update: {e}", exc_info=e)
             raise
@@ -212,10 +302,10 @@ class BaseRepository:
     @db_session
     def update_one_with_filters(self, filters=None, data: dict = {}):
         """
-        Update an existing entity with fitlers.
+        Update an existing entity with filters.
 
         Args:
-            data: The updated data for the entity with fitlers.
+            data: The updated data for the entity with filters.
 
         Returns:
             The updated entity, or None if the entity does not exist.
@@ -224,12 +314,17 @@ class BaseRepository:
             Exception: If an error occurs during update.
         """
         try:
-            entity_obj = self.get_one_by_filters(filters)
+            entity_obj = self.get_one_by_filters(filters, to_model=True)
             if not entity_obj:
                 return None
             
             entity_obj.set(**data)
-            return entity_obj.to_dict(with_collections=True)
+            result = entity_obj
+            
+            if self.schema and result is not None:
+                result = self.schema.model_validate(result).model_dump()
+            
+            return result
         except Exception as e:
             logger.error(f"Error in update_one_with_filters: {e}", exc_info=e)
             raise
@@ -250,12 +345,14 @@ class BaseRepository:
             Exception: If an error occurs during deletion.
         """
         try:
-            obj = self.get_by_id(id)
-            if obj:
-                if not soft_delete:
-                    obj.delete()
-                else:
-                    obj.is_deleted = True
+            obj = self.get_by_id(id, to_model=True)
+            if not obj:
+                return None
+
+            if soft_delete and hasattr(obj, "is_deleted"):
+                obj.is_deleted = True
+            else:
+                obj.delete()
             
             return True
         except Exception as e:

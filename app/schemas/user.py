@@ -1,10 +1,8 @@
-from uuid import UUID
-from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, ConfigDict, field_validator, Field, model_validator
-from app.schemas.response import *
+from app.schemas.base import *
 
-class UserFilter(BaseFilter):
+class UserFilter(BasePaginationFilter):
     email: Optional[str] = None
     username: Optional[str] = None
     full_name: Optional[str] = None
@@ -19,7 +17,7 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field("", min_length=6, max_length=20)
     full_name: Optional[str] = Field("", min_length=1)
 
-class UserResponse(BaseModel):
+class UserResponse(MyBaseModel):
     id: str
     email: EmailStr
     username: Optional[str] = None
@@ -31,33 +29,15 @@ class UserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_validator("id", mode="before")
-    def format_uuid(cls, v):
-        return str(v) if isinstance(v, UUID) else v
-
-    @field_validator("created_at", "updated_at", mode="before")
-    def format_datetime(cls, v):
-        return v.isoformat() if isinstance(v, datetime) else v
-
-class UserPublicResponse(BaseModel):
+class UserPublicResponse(MyBaseModel):
     id: str
     email: EmailStr
     username: Optional[str] = None
-    # password: str
     full_name: str
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
-    # is_deleted: bool = False
 
     model_config = ConfigDict(from_attributes=True)
-
-    @field_validator("id", mode="before")
-    def format_uuid(cls, v):
-        return str(v) if isinstance(v, UUID) else v
-
-    @field_validator("created_at", "updated_at", mode="before")
-    def format_datetime(cls, v):
-        return v.isoformat() if isinstance(v, datetime) else v
 
 class UserPublicResponseResource(BaseResponse):
     data: UserPublicResponse
@@ -100,3 +80,11 @@ class UserLoginResponse(UserPublicResponse):
 
 class UserLoginResponseResource(BaseResponse):
     data: UserLoginResponse
+
+class UserSimple(MyBaseModel):
+    id: str
+    full_name: str
+    email: EmailStr
+    username: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)

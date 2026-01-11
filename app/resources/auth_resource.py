@@ -1,6 +1,6 @@
 from app.resources.base import api_spec, Response, BaseResource
 from app.services.user_service import UserService
-from app.schemas.user_schema import UserLoginSchema, UserLoginResponseResource, UserRegisterSchema, UserPublicResponseResource
+from app.schemas.user import UserLoginSchema, UserLoginResponseResource, UserRegisterSchema, UserPublicResponseResource
 
 class BaseAuthResource(BaseResource):
     def __init__(self):

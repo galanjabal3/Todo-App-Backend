@@ -13,8 +13,14 @@ from app.db.database import init_db
 from app.middlewares.jwt_middleware import JWTMiddleware
 from app.middlewares.cors_middleware import CORSMiddleware
 
+import app.registry.service_registry   # ⬅️ registry di-load di sini
+from app.container import ServiceContainer
+
 
 def create_app():
+    # Mark service container as ready AFTER all registry wiring is done
+    ServiceContainer.boot()
+
     # Initialize Database
     init_db()
 
@@ -30,7 +36,6 @@ def create_app():
         api_spec.register(app) # Register app with SpecTree to generate Swagger
 
     logger.info("[STARTUP] Todo App Backend is starting in %s environment", ENVIRONMENT.capitalize())
-    
     return app
 
 

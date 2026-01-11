@@ -1,5 +1,5 @@
 import re
-from app.schemas.user_schema import *
+from app.schemas.user import *
 from app.repositories.user_repository import UserRepository
 from app.services.base import BaseService
 from app.utils.logger import logger
@@ -7,12 +7,12 @@ from app.utils.other import check_string, hash_string
 from app.utils.jwt import create_access_token
 from app.utils.http_exceptions import not_found, unauthorized, conflict
 
-class UserService(BaseService):
+class UserService(BaseService[UserRepository]):
     EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
     
     def __init__(self):
         # We pass the repo and the schema variable to the parent
-        super().__init__(repository=UserRepository(), schema_class=UserResponse)
+        super().__init__(repository=UserRepository())
         
     def auth_login(self, payload: dict = {}):
         try:

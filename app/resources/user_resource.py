@@ -1,6 +1,6 @@
-from app.resources.base import api_spec, Response, BaseResource, generate_filters_resource
+from app.resources.base import api_spec, Response, BaseResource
 from app.services.user_service import UserService
-from app.schemas.user_schema import UserFilter, UserPublicResponseResource, UserPublicResponse, UserUpdate, ListUserPublicResponseResource
+from app.schemas.user import UserFilter, UserPublicResponseResource, UserPublicResponse, UserUpdate, ListUserPublicResponseResource
 
 class BaseUserResource(BaseResource):
     def __init__(self):
@@ -14,9 +14,9 @@ class UsersResource(BaseUserResource):
         tags=["User"]
     )
     def on_get(self, req, resp):
-        filters = generate_filters_resource(req, params_string=["email", "username"])
-        page = req.get_param("page", default=1, required=False)
-        limit = req.get_param("limit", default=100, required=False)
+        filters = self.generate_filters_resource(req, params_string=["email", "username"])
+        page = req.get_param_as_int("page", default=1, required=False)
+        limit = req.get_param_as_int("limit", default=100, required=False)
         
         data, pagination = self.service.get_all_with_filters_and_pagination(
             page=page,

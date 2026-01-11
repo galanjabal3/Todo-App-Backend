@@ -39,54 +39,54 @@ class BaseResource:
         if metadata:
             resp.media["metadata"] = metadata
 
-def generate_filters_resource(req=None, params_string=[], params_int=[], params_bool=[], params_list=[]):
-    filters = []
+    def generate_filters_resource(self, req=None, params_string=[], params_int=[], params_bool=[], params_list=[]):
+        filters = []
 
-    # Handle string and int parameters
-    for param in chain(params_string, params_int):
-        value = req.get_param(param, required=False, default="" if param in params_string else None)
-        if value not in ["", None]:
-            if param in params_int and value.isdigit():
+        # Handle string and int parameters
+        for param in chain(params_string, params_int):
+            value = req.get_param(param, required=False, default="" if param in params_string else None)
+            if value not in ["", None]:
+                if param in params_int and value.isdigit():
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        continue  # skip invalid int
+                filters.append({"field": param, "value": value})
+        
+        # Handle boolean parameters
+        for param in params_bool:
+            value = req.get_param(param, required=False)
+            if value is not None:
+                value_str = str(value).strip().upper()
+                if value_str == "TRUE" or value_str == "1":
+                    filters.append({"field": param, "value": True})
+                elif value_str == "FALSE" or value_str == "0":
+                    filters.append({"field": param, "value": False})
+
+        # Handle list parameters
+        for param in params_list:
+            value = req.get_param(param, required=False)
+            if value:
+                value = value.strip()
+                items = []
+
                 try:
-                    value = int(value)
-                except ValueError:
-                    continue  # skip invalid int
-            filters.append({"field": param, "value": value})
-    
-    # Handle boolean parameters
-    for param in params_bool:
-        value = req.get_param(param, required=False)
-        if value is not None:
-            value_str = str(value).strip().upper()
-            if value_str == "TRUE" or value_str == "1":
-                filters.append({"field": param, "value": True})
-            elif value_str == "FALSE" or value_str == "0":
-                filters.append({"field": param, "value": False})
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        items = parsed
+                    else:
+                        # parsed is a single item
+                        items = [parsed]
+                except json.JSONDecodeError:
+                    # Fallback: split by comma
+                    items = [v.strip() for v in value.split(",") if v.strip()]
+                    if not items:
+                        items = [value]
 
-    # Handle list parameters
-    for param in params_list:
-        value = req.get_param(param, required=False)
-        if value:
-            value = value.strip()
-            items = []
+                # If all are digit-like, convert to int
+                if all(isinstance(item, str) and item.isdigit() for item in items):
+                    items = list(map(int, items))
 
-            try:
-                parsed = json.loads(value)
-                if isinstance(parsed, list):
-                    items = parsed
-                else:
-                    # parsed is a single item
-                    items = [parsed]
-            except json.JSONDecodeError:
-                # Fallback: split by comma
-                items = [v.strip() for v in value.split(",") if v.strip()]
-                if not items:
-                    items = [value]
+                filters.append({"field": param, "value": items})
 
-            # If all are digit-like, convert to int
-            if all(isinstance(item, str) and item.isdigit() for item in items):
-                items = list(map(int, items))
-
-            filters.append({"field": param, "value": items})
-
-    return filters
+        return filters
