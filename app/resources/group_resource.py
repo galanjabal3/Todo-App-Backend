@@ -32,7 +32,10 @@ class GroupsResource(BaseGroupResource):
     )
     def on_post(self, req, resp):
         body = self.parse_body(req, GroupPayload)
-        self.resource_response(resp=resp, data=self.service.create(body))
+        self.resource_response(resp=resp, data=self.service.create_group(
+            body,
+            user_id=req.context["user"]["id"]
+        ))
 
 class GroupsWithIdResource(BaseGroupResource):
 

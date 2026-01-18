@@ -48,6 +48,22 @@ class GroupMemberDB(db.Entity):
     
     PrimaryKey(group, user)
 
+    @property
+    def id(self):
+        return self.user.id
+
+    @property
+    def full_name(self):
+        return self.user.full_name
+
+    @property
+    def email(self):
+        return self.user.email
+
+    @property
+    def username(self):
+        return self.user.username
+
 
 class TaskDB(db.Entity):
     _table_ = "tasks"

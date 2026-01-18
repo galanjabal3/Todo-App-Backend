@@ -101,7 +101,14 @@ class BaseService(Generic[TRepo]):
             Exception: If an error occurs during data retrieval.
         """
         try:
-            return self.repo.get_by_id(id, to_model=to_model, schema_response=schema_response)
+            datas = self.repo.get_by_id(id, to_model=to_model, schema_response=schema_response)
+            if not datas:
+                not_found(
+                    title=f"{self.entity_name} not found",
+                    msg=f"{self.entity_name} does not exist"
+                )
+            
+            return datas
         except Exception as e:
             logger.error(f"Err in get_by_id: {e}", exc_info=e)
             raise
@@ -123,7 +130,10 @@ class BaseService(Generic[TRepo]):
             filters = self.format_filters(filters)
             datas = self.repo.get_one_by_filters(filters, to_model=to_model, schema_response=schema_response)
             if not datas:
-                return None
+                not_found(
+                    title=f"{self.entity_name} not found",
+                    msg=f"{self.entity_name} does not exist"
+                )
             
             return datas
         except Exception as e:
@@ -166,6 +176,12 @@ class BaseService(Generic[TRepo]):
         """
         try:
             datas = self.repo.update(data)
+            if datas is None:
+                not_found(
+                    title=f"{self.entity_name} not found",
+                    msg=f"{self.entity_name} does not exist"
+                )
+            
             return self.repo.schema.model_validate(datas).model_dump()
         except Exception as e:
             logger.error(f"Err in update: {e}", exc_info=e)
@@ -187,8 +203,11 @@ class BaseService(Generic[TRepo]):
         try:
             filters = self.format_filters(filters)
             datas = self.repo.update_one_with_filters(filters, data)
-            if not datas:
-                return datas
+            if datas is None:
+                not_found(
+                    title=f"{self.entity_name} not found",
+                    msg=f"{self.entity_name} does not exist"
+                )
 
             return self.repo.schema.model_validate(datas).model_dump()
         except Exception as e:

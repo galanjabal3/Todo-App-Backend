@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 from app.container import ServiceContainer
 from app.repositories.group_member_repository import GroupMemberRepository
 from app.services.base import BaseService
-from app.schemas.group_member import GroupMemberCreate
 from app.utils.logger import logger
 from app.utils.enums import EntityType
 from app.utils.http_exceptions import not_found
@@ -20,7 +19,4 @@ class GroupMemberService(BaseService):
     @property
     def group_service(self) -> "GroupService":
         return ServiceContainer.get(EntityType.GROUP)
-
-    def add_member(self, payload: GroupMemberCreate):
-        pass
     

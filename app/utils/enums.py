@@ -16,3 +16,8 @@ class EntityType(Enum):
     GROUP = "group"
     GROUP_MEMBER = "group_member"
     TASK = "task"
+
+
+class RoleType(str, Enum):
+    ADMIN = 'admin'
+    USER = 'user'

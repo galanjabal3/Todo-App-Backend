@@ -1,22 +1,20 @@
-from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict
+from app.schemas.base import MyBaseModel
 from app.schemas.user import UserSimple
 
-class GroupMemberCreate(BaseModel):
+class GroupMemberCreate(MyBaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    user_id: UUID
+    group_id: str
+    user_id: str
     role: str = "member"
 
-class GroupMemberResponse(BaseModel):
-    group_id: UUID
-    user_id: UUID
+class GroupMemberResponse(MyBaseModel):
+    group: str
+    user: str
     role: str
     joined_at: datetime
 
-class GroupMemberSimple(BaseModel):
-    user: UserSimple = Field(default_factory=dict)
+class GroupMemberSimple(UserSimple):
     role: str
-
-    model_config = ConfigDict(from_attributes=True)

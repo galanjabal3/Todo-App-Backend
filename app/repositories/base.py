@@ -119,7 +119,7 @@ class BaseRepository:
             logger.error(f"Error in apply_query_options: {e}", exc_info=e)
             raise
 
-    @db_session
+    # @db_session
     def get_by_id(self, id, to_model=False, schema_response=None):
         """
         Retrieve an entity by its ID.
@@ -151,7 +151,7 @@ class BaseRepository:
             logger.error(f"Error in get_by_id: {e}", exc_info=e)
             raise
 
-    @db_session
+    # @db_session
     def get_all_with_filters_and_pagination(self, filters=None, page=1, limit=10, order_by="created_at", to_model=False,  schema_response=None):
         """
         Retrieve all entities with filters and pagination.
@@ -212,7 +212,7 @@ class BaseRepository:
                 "total_pages": 0
             }
     
-    @db_session
+    # @db_session
     def get_one_by_filters(self, filters=None, to_model=False, schema_response=None):
         """
         Retrieve a single entity matching the filters.
@@ -248,8 +248,8 @@ class BaseRepository:
             logger.error(f"Error in get_one_by_filters: {e}", exc_info=e)
             raise
 
-    @db_session
-    def create(self, data: dict):
+    # @db_session
+    def create(self, data: dict, to_model=False):
         """
         Create a new entity.
 
@@ -264,12 +264,15 @@ class BaseRepository:
         """
         try:
             entity_obj = self.entity(**data)
+            if to_model:
+                return entity_obj
+            
             return entity_obj.to_dict(with_collections=True)
         except Exception as e:
             logger.error(f"Error in create: {e}", exc_info=e)
             raise
 
-    @db_session
+    # @db_session
     def update(self, data: dict):
         """
         Update an existing entity.
@@ -299,7 +302,7 @@ class BaseRepository:
             logger.error(f"Error in update: {e}", exc_info=e)
             raise
     
-    @db_session
+    # @db_session
     def update_one_with_filters(self, filters=None, data: dict = {}):
         """
         Update an existing entity with filters.
@@ -329,7 +332,7 @@ class BaseRepository:
             logger.error(f"Error in update_one_with_filters: {e}", exc_info=e)
             raise
 
-    @db_session
+    # @db_session
     def delete_by_id(self, id, soft_delete=True):
         """
         Delete an entity by its ID.
