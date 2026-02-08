@@ -35,7 +35,7 @@ This project uses **Gunicorn** as the WSGI HTTP server.
 
 Example:
 ```
-gunicorn app.main:api -w 5 -b 0.0.0.0:8000
+gunicorn app.main:app -b 0.0.0.0:8000
 ```
 
 The API will be available at:

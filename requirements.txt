@@ -1,7 +1,7 @@
 falcon
 pony
 gunicorn
-psycopg2
+psycopg2-binary  
 rich
 python-dotenv
 pydantic
