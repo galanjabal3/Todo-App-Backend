@@ -1,7 +1,7 @@
 # Resource Entities
 from app.resources.base import HealthResource
 from app.resources.auth_resource import AuthLoginResource, AuthRegisterResource
-from app.resources.user_resource import UserProfileResource, UsersResource
+from app.resources.user_resource import UserProfileResource, UsersResource, UserPasswordResource
 from app.resources.group_resource import GroupsResource, GroupsWithIdResource, MyGroupsResource
 from app.resources.task_resource import TaskResource, TaskWithIdResource, GroupTasksResource
 
@@ -19,6 +19,7 @@ def register_routes(app, api_prefix="/api"):
 
     add("/admin/users", UsersResource())
     add("/user/profile", UserProfileResource())
+    add("/user/profile/password", UserPasswordResource())
     
     # Group
     add("/user/my_groups", MyGroupsResource())

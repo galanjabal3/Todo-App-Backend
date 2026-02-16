@@ -1,6 +1,6 @@
 from app.resources.base import api_spec, Response, BaseResource
 from app.services.user_service import UserService
-from app.schemas.user import UserFilter, UserPublicResponseResource, UserPublicResponse, UserUpdate, ListUserPublicResponseResource
+from app.schemas.user import  *
 from app.utils.enums import TagsSwagger
 from app.utils.http_exceptions import forbidden
 
@@ -55,3 +55,17 @@ class UserProfileResource(BaseUserResource):
         payload = req.media
         payload["id"] = usr_id
         self.resource_response(resp=resp, data=self.service.update_one_with_filters(filters={"id": usr_id}, data=payload))
+
+class UserPasswordResource(BaseUserResource):
+
+    @api_spec.validate(
+        json=UserUpdatePassword,
+        resp=Response(HTTP_200=BaseResponse[bool]),
+        tags=[TagsSwagger.USER.value]
+    )
+    def on_put(self, req, resp):
+        usr_id = req.context["user"]["id"]
+        
+        payload = req.media
+        payload["id"] = usr_id
+        self.resource_response(resp=resp, data=self.service.update_password_user(payload=payload, user_id=usr_id))

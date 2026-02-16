@@ -69,7 +69,7 @@ class TaskWithIdResource(BaseGroupResource):
         self.resource_response(resp=resp, data=self.service.update_status_or_assign(task_id=id, payload=body))
     
     @api_spec.validate(
-        resp=Response(HTTP_200=DeleteResponse),
+        resp=Response(HTTP_200=BaseResponse[bool]),
         tags=[TagsSwagger.TASK.value]
     )
     def on_delete(self, req, resp, id: str):

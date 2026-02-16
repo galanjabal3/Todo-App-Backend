@@ -71,7 +71,7 @@ class GroupsWithIdResource(BaseGroupResource):
         self.resource_response(resp=resp, data=self.service.update(body))
     
     @api_spec.validate(
-        resp=Response(HTTP_200=DeleteResponse),
+        resp=Response(HTTP_200=BaseResponse[bool]),
         tags=[TagsSwagger.GROUP.value]
     )
     def on_delete(self, req, resp, id: str):

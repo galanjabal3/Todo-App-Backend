@@ -1,7 +1,7 @@
 from typing import TypeVar, Generic, Optional
 from app.utils.logger import logger
 from app.utils.other import list_filter_dict_to_list
-from app.utils.http_exceptions import not_found, unauthorized, conflict
+from app.utils.http_exceptions import not_found
 from app.repositories.base import BaseRepositoryProtocol
 
 TRepo = TypeVar("TRepo", bound=BaseRepositoryProtocol)

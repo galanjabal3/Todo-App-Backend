@@ -10,9 +10,6 @@ class BaseResponse(BaseModel, Generic[T]):
     message: str = "Success"
     data: Optional[T] = None
     
-class DeleteResponse(BaseResponse[bool]):
-    data: Union[bool, None] = True
-
 class PaginationResponse(BaseModel):
     page: int
     limit: int

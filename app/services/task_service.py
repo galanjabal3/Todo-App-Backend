@@ -5,7 +5,7 @@ from app.repositories.task_repository import TaskRepository
 from app.services.base import BaseService
 from app.schemas.task import  *
 from app.utils.logger import logger
-from app.utils.http_exceptions import not_found, unauthorized, conflict
+from app.utils.http_exceptions import not_found
 from app.utils.enums import EntityType
 
 if TYPE_CHECKING:

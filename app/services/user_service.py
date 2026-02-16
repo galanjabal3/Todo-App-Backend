@@ -5,7 +5,7 @@ from app.services.base import BaseService
 from app.utils.logger import logger
 from app.utils.other import check_string, hash_string
 from app.utils.jwt import create_access_token
-from app.utils.http_exceptions import not_found, unauthorized, conflict
+from app.utils.http_exceptions import not_found, conflict, bad_request
 
 class UserService(BaseService[UserRepository]):
     EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
@@ -33,7 +33,7 @@ class UserService(BaseService[UserRepository]):
                 not_found(msg="Email or Username not found.")
 
             if not check_string(password, user_exist.password):
-                unauthorized(msg="Password is incorrect.")
+                bad_request(msg="Password is incorrect.")
             
             user_resp = UserPublicResponse.model_validate(user_exist).model_dump(mode="json")
             
@@ -66,3 +66,22 @@ class UserService(BaseService[UserRepository]):
             logger.error(f"Err in auth_register: {str(e)}", exc_info=True)
             raise e
     
+    def update_password_user(self, payload: dict, user_id: str):
+        try:
+            current_password = payload.get("current_password")
+            new_password = payload.get("password")
+
+            user_exist = self.get_by_id(id=user_id, to_model=True)
+            if not user_exist:
+                not_found(msg="User not found.")
+
+            if not check_string(current_password, user_exist.password):
+                bad_request(msg="Current password is incorrect.")
+            
+            self.update({"id": user_exist.id, "password": hash_string(new_password)})
+
+            return True
+        
+        except Exception as e:
+            logger.error(f"Err in update_password: {str(e)}", exc_info=True)
+            raise e

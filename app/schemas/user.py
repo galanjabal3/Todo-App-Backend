@@ -19,6 +19,10 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field("", min_length=6, max_length=20)
     full_name: Optional[str] = Field("", min_length=1)
 
+class UserUpdatePassword(BaseModel):
+    current_password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=8)
+
 class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
@@ -65,7 +69,7 @@ class UserRegisterSchema(BaseModel):
 
 class UserLoginSchema(BaseModel):
     identity: str = Field(..., min_length=3, description="username / email")
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=1)
 
     @field_validator("identity")
     @classmethod
