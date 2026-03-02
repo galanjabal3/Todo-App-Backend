@@ -229,6 +229,27 @@ class BaseService(Generic[TRepo]):
             logger.error(f"Err in update_one_with_filters: {e}", exc_info=e)
             raise
 
+    def update_all_with_filters(self, filters=None, data: dict = {}):
+        """
+        Update all entities matching the given filters.
+
+        Args:
+            filters: List of filters to apply.
+            data: The updated data for the entities.
+
+        Returns:
+            True if update was successful, None if no records found.
+
+        Raises:
+            Exception: If an error occurs during update.
+        """
+        try:
+            filters = self.format_filters(filters)
+            return self.repo.update_all_with_filters(filters=filters, data=data)
+        except Exception as e:
+            logger.error(f"Error in update_all_with_filters: {e}", exc_info=e)
+            raise
+
     def delete_by_id(self, id, soft_delete=True):
         """
         Delete a record by its ID.
@@ -254,4 +275,25 @@ class BaseService(Generic[TRepo]):
             return self.repo.delete_by_id(id, soft_delete=soft_delete)
         except Exception as e:
             logger.error(f"Err in delete_by_id: {e}", exc_info=e)
+            raise
+
+    def delete_with_filters(self, filters=None, soft_delete=True):
+        """
+        Delete all records matching the given filters.
+
+        Args:
+            filters: Dictionary of filters to apply.
+            soft_delete: Whether to perform a soft delete (default: True).
+
+        Returns:
+            True if deletion was successful, None if no records found.
+
+        Raises:
+            Exception: If an error occurs during deletion.
+        """
+        try:
+            filters = self.format_filters(filters)
+            return self.repo.delete_with_filters(filters=filters, soft_delete=soft_delete)
+        except Exception as e:
+            logger.error(f"Error in delete_with_filters: {e}", exc_info=e)
             raise

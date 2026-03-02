@@ -5,7 +5,7 @@ from app.resources.user_resource import UserProfileResource, UsersResource, User
 from app.resources.group_resource import (
     GroupsResource, GroupsWithIdResource, MyGroupsResource,
     RequestJoinGroupResource, ApproveNewMemberGroupResource,
-    GroupInviteResource, GroupPreviewResource
+    GroupInviteResource, GroupPreviewResource, LeaveGroupResource
 )
 from app.resources.task_resource import TaskResource, TaskWithIdResource, GroupTasksResource
 
@@ -21,6 +21,7 @@ def register_group_routes(add):
     add("/user/groups/{id}/approve", ApproveNewMemberGroupResource())
     add("/user/groups/{id}/invite", GroupInviteResource())
     add("/user/groups/{id}/tasks", GroupTasksResource())
+    add("/user/groups/{id}/leave", LeaveGroupResource())
     add("/user/groups/preview/{token}", GroupPreviewResource())
 
 

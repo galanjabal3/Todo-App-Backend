@@ -184,3 +184,9 @@ class TaskService(BaseService[TaskRepository]):
         except Exception as e:
             logger.error(f"Error update_status_or_assign: {e}")
             raise
+
+    def unassign_tasks_by_user_in_group(self, group_id: str, user_id: str):
+        return self.update_all_with_filters(filters={
+            "group_id": group_id,
+            "user_id": user_id,
+        }, data={"assigned_to": None})

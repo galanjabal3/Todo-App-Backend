@@ -1,4 +1,4 @@
-from pony.orm import db_session
+from pony.orm import db_session, OptimisticCheckError
 from app.utils.logger import logger
 
 class PonyDbSessionMiddleware:
@@ -20,6 +20,9 @@ class PonyDbSessionMiddleware:
                 db_session.__exit__(None, None, None)
             else:
                 db_session.__exit__(Exception, Exception("Request failed"), None)
+        except OptimisticCheckError as e:
+            # Object has been deleted — no need to raise, operation succeeded
+            logger.warning(f"OptimisticCheckError (ignored): {e}")
         except Exception:
             logger.exception("Error closing db_session")
             raise

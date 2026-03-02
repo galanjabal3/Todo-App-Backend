@@ -1,5 +1,6 @@
 import math
 import uuid
+from pony.orm import commit
 from typing import Type, Protocol, Optional
 from pydantic import BaseModel
 from pony.orm import select, desc
@@ -39,9 +40,12 @@ class BaseRepositoryProtocol(Protocol):
     def update(self, data: dict): ...
     
     def update_one_with_filters(self, filters=None, data: dict = {}): ...
+
+    def update_all_with_filters(self, filters=None, data: dict = {}): ...
     
     def delete_by_id(self, id, soft_delete=True): ...
-    
+
+    def delete_with_filters(self, filters=None, soft_delete=True): ...
 
 # -------------------------------
 # BaseRepository (runtime)
@@ -93,8 +97,9 @@ class BaseRepository:
         try:
             filters = filters or []
             
-            # Default soft delete
-            if not any(f.get("field") == "is_deleted" for f in filters):
+            # Default soft delete — only if model has is_deleted field
+            has_is_deleted = hasattr(self.entity, "is_deleted")
+            if has_is_deleted and not any(f.get("field") == "is_deleted" for f in filters):
                 handler = self.filter_map.get("is_deleted")
                 if handler:
                     query = handler(query, False)
@@ -367,6 +372,36 @@ class BaseRepository:
         except Exception as e:
             logger.error(f"Error in update_one_with_filters: {e}", exc_info=e)
             raise
+    
+    # @db_session
+    def update_all_with_filters(self, filters=None, data: dict = {}):
+        """
+        Update all entities matching the given filters.
+
+        Args:
+            filters: List of filters to apply.
+            data: The updated data for the entities.
+
+        Returns:
+            True if update was successful, None if no records found.
+
+        Raises:
+            Exception: If an error occurs during update.
+        """
+        try:
+            query = select(e for e in self.entity)
+            query = self.apply_query_options(query, filters)
+
+            if query.count() == 0:
+                return None
+
+            for entity_obj in query:
+                entity_obj.set(**data)
+
+            return True
+        except Exception as e:
+            logger.error(f"Error in update_all_with_filters: {e}", exc_info=e)
+            raise
 
     # @db_session
     def delete_by_id(self, id, soft_delete=True):
@@ -396,4 +431,37 @@ class BaseRepository:
             return True
         except Exception as e:
             logger.error(f"Error in delete_by_id: {e}", exc_info=e)
+            raise
+    
+    # @db_session
+    def delete_with_filters(self, filters=None, soft_delete=True):
+        """
+        Delete all entities matching the given filters.
+
+        Args:
+            filters: Dictionary of filters to apply.
+            soft_delete: Whether to perform a soft delete (default: True).
+
+        Returns:
+            True if deletion was successful, None if no records found.
+
+        Raises:
+            Exception: If an error occurs during deletion.
+        """
+        try:
+            query = select(e for e in self.entity)
+            query = self.apply_query_options(query, filters)
+
+            if query.count() == 0:
+                return None
+
+            if soft_delete and hasattr(self.entity, "is_deleted"):
+                for data in query:
+                    data.is_deleted = True
+            else:
+                query.delete(bulk=True)
+
+            return True
+        except Exception as e:
+            logger.error(f"Error in delete_with_filters: {e}", exc_info=e)
             raise

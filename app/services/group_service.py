@@ -5,12 +5,13 @@ from app.services.base import BaseService
 from app.schemas.group import GroupResponse, PreviewGroupResponse
 from app.utils.logger import logger
 from app.utils.enums import EntityType, GroupRole
-from app.utils.http_exceptions import not_found, conflict
+from app.utils.http_exceptions import not_found, bad_request, forbidden, conflict
 from app.utils.token_group import verify_group_invite_token, generate_group_invite_token
 
 if TYPE_CHECKING:
     from app.services.group_member_service import GroupMemberService
     from app.services.user_service import UserService
+    from app.services.task_service import TaskService
 
 class GroupService(BaseService[GroupRepository]):
     
@@ -25,6 +26,10 @@ class GroupService(BaseService[GroupRepository]):
     @property
     def user_service(self) -> "UserService":
         return ServiceContainer.get(EntityType.USER)
+
+    @property
+    def task_service(self) -> "TaskService":
+        return ServiceContainer.get(EntityType.TASK)
 
     def get_all_group_by_member(self, user_id: str):
         group_members = self.group_member_service.get_all_with_filters(filters={
@@ -60,6 +65,33 @@ class GroupService(BaseService[GroupRepository]):
         except Exception as e:
             logger.error(f"Err in create_group: {e}", exc_info=e)
             raise
+    
+    def delete_group_by_id(self, group_id: str, user_id: str):
+        group = self.get_by_id(id=group_id, to_model=True)
+        if not group:
+            not_found(msg="Group not found")
+        
+        # Cek apakah user adalah admin
+        member = self.group_member_service.get_one_by_filters({
+            "group_id": group_id,
+            "user_id": user_id,
+        }, to_model=True)
+        if not member or member.role != "admin":
+            forbidden("Only admin can delete group")
+
+        filters = {
+            "group_id": group_id
+        }
+        
+        # Delete Member Group & Task
+        self.group_member_service.delete_with_filters(filters=filters, soft_delete=False)
+        self.task_service.delete_with_filters(filters=filters, soft_delete=False)
+
+        # Delete Group
+        self.repo.delete_by_id(id=group_id, soft_delete=False)
+
+        return True
+
 
     def get_group_invite_token(self, group_id: str, user_id: str, expires_days: int = 7):
         group = self.get_by_id(id=group_id, to_model=True)
@@ -72,7 +104,7 @@ class GroupService(BaseService[GroupRepository]):
             "user_id": user_id,
         }, to_model=True)
         if not member or member.role != "admin":
-            raise ValueError("Only admin can generate invite link")
+            forbidden("Only admin can generate invite link")
         
         token = generate_group_invite_token(group_id, expires_days=expires_days)
         return {
@@ -130,16 +162,16 @@ class GroupService(BaseService[GroupRepository]):
             "user_id": admin_id,
         }, to_model=True)
         if not admin or admin.role != "admin":
-            raise ValueError("Only admin can approve")
+            forbidden(msg="Only admin can approve")
 
         member = self.group_member_service.get_one_by_filters({
             "group_id": group_id,
             "user_id": user_id,
         }, to_model=True)
         if not member:
-            raise ValueError("User not found in group")
+            not_found(msg="User not found in group")
         if member.role != "pending":
-            raise ValueError("User is not pending")
+            conflict(msg="User is not pending")
 
         if approve:
             member.role = "member"
@@ -148,3 +180,18 @@ class GroupService(BaseService[GroupRepository]):
             # Reject — hapus dari group
             member.delete()
             return {"approved": False, "message": "Member rejected"}
+    
+    def leave_group_by_user(self, group_id: str, user_id: str):
+        filters = {
+            "group_id": group_id,
+            "user_id": user_id,
+        }
+        member = self.group_member_service.get_one_by_filters(filters, to_model=True)
+        if not member:
+            not_found(msg="Member not found")
+
+        self.task_service.unassign_tasks_by_user_in_group(group_id=group_id, user_id=user_id)
+        
+        self.group_member_service.delete_with_filters(filters=filters)
+
+        return True

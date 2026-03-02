@@ -75,7 +75,10 @@ class GroupsWithIdResource(BaseGroupResource):
         tags=[TagsSwagger.GROUP.value]
     )
     def on_delete(self, req, resp, id: str):
-        self.resource_response(resp=resp, data=self.service.delete_by_id(id=id))
+        self.resource_response(resp=resp, data=self.service.delete_group_by_id(
+            group_id=id,
+            user_id=req.context["user"]["id"],
+        ))
 
 class GroupInviteResource(BaseGroupResource):
     @api_spec.validate(
@@ -124,4 +127,15 @@ class ApproveNewMemberGroupResource(BaseGroupResource):
             user_id=body.get("user_id"),
             admin_id=req.context["user"]["id"],
             approve=body.get("approve", True)
+        ))
+
+class LeaveGroupResource(BaseGroupResource):
+    @api_spec.validate(
+        resp=Response(HTTP_200=BaseResponse[bool]),
+        tags=[TagsSwagger.GROUP.value]
+    )
+    def on_delete(self, req, resp, id: str):
+        self.resource_response(resp=resp, data=self.service.leave_group_by_user(
+            group_id=id,
+            user_id=req.context["user"].get("id"),
         ))
