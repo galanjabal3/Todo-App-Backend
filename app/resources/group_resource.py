@@ -139,3 +139,15 @@ class LeaveGroupResource(BaseGroupResource):
             group_id=id,
             user_id=req.context["user"].get("id"),
         ))
+
+class RemoveMembersFromGroupResource(BaseGroupResource):
+    @api_spec.validate(
+        resp=Response(HTTP_200=BaseResponse[bool]),
+        tags=[TagsSwagger.GROUP.value]
+    )
+    def on_delete(self, req, resp, id: str, user_id: str):
+        self.resource_response(resp=resp, data=self.service.remove_members_from_group(
+            group_id=id,
+            user_id=user_id,
+            admin_id=req.context["user"].get("id"),
+        ))

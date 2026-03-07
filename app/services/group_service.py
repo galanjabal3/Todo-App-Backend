@@ -195,3 +195,25 @@ class GroupService(BaseService[GroupRepository]):
         self.group_member_service.delete_with_filters(filters=filters)
 
         return True
+    
+    def remove_members_from_group(self, group_id: str, user_id: str, admin_id: str):
+        admin = self.group_member_service.get_one_by_filters({
+            "group_id": group_id,
+            "user_id": admin_id,
+        }, to_model=True)
+        if not admin or admin.role != "admin":
+            forbidden(msg="Only admin can remove member")
+
+        filters = {
+            "group_id": group_id,
+            "user_id": user_id,
+        }
+        member = self.group_member_service.get_one_by_filters(filters, to_model=True)
+        if not member:
+            not_found(msg="Member not found")
+
+        self.task_service.unassign_tasks_by_user_in_group(group_id=group_id, user_id=user_id)
+        
+        self.group_member_service.delete_with_filters(filters=filters)
+
+        return True
