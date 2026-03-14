@@ -74,6 +74,7 @@ class TaskDB(db.Entity):
     due_date = Optional(datetime)
     status = Optional(str, default=StatusTask.TODO.value)
     attachment = Optional(Json)
+    priority = Optional(str, default=None, nullable=True)
     
     created_at = Required(datetime, default=lambda: datetime.now(timezone.utc))
     updated_at = Optional(datetime, default=lambda: datetime.now(timezone.utc))

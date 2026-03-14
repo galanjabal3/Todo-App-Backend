@@ -1,14 +1,17 @@
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, model_validator
-from app.utils.enums import StatusTask
+from app.utils.enums import StatusTask, PriorityTask
 from app.schemas.base import *
 from app.schemas.common import GroupSimple, UserSimple
+
 
 class TaskFilter(BasePaginationFilter):
     title: Optional[str] = None
     status: Optional[StatusTask] = None
+    priority: Optional[PriorityTask] = None
+
 
 class TaskPayload(BaseModel):
     title: str
@@ -18,6 +21,8 @@ class TaskPayload(BaseModel):
     attachment: list = Field(default_factory=list)
     group_id: Optional[str] = ""
     assigned_to_id: Optional[str] = ""
+    priority: Optional[PriorityTask] = None
+
 
 class TaskCreate(BaseModel):
     title: str
@@ -25,8 +30,10 @@ class TaskCreate(BaseModel):
     status: Optional[StatusTask] = StatusTask.TODO
     due_date: Optional[datetime] = None
     attachment: list = Field(default_factory=list)
+    priority: Optional[PriorityTask] = None
 
     model_config = ConfigDict(use_enum_values=True)
+
 
 class TaskUpdateStatusOrAssign(BaseModel):
     status: Optional[StatusTask] = None
@@ -49,16 +56,19 @@ class TaskUpdateStatusOrAssign(BaseModel):
 
         return self
 
+
 class TaskUpdate(BaseModel):
     id: UUID
     title: str
     description: Optional[str] = ""
-    status: Optional[StatusTask] = ""
+    status: Optional[StatusTask] = None
     due_date: Optional[datetime] = None
     assigned_to: Optional[str] = None
     attachment: list = Field(default_factory=list)
+    priority: Optional[PriorityTask] = None
 
     model_config = ConfigDict(use_enum_values=True)
+
 
 class TaskResponse(BaseModel):
     id: UUID
@@ -67,28 +77,32 @@ class TaskResponse(BaseModel):
     status: str
     due_date: Optional[datetime] = None
     attachment: list = Field(default_factory=list)
-    assigned_to: Optional[UserSimple] | None
-    group: Optional[GroupSimple] | None
+    assigned_to: Optional[UserSimple] = None
+    group: Optional[GroupSimple] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    priority: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class TaskResponseResource(BaseResponse):
     data: TaskResponse
 
+
 class ListTaskResponseResource(ListResponseWithPagination):
     data: List[TaskResponse]
+
 
 class AttachmentUpload(BaseModel):
     """Schema for file upload validation in Swagger."""
     file: bytes
 
     class Config:
-        # Mark as multipart form
         json_schema_extra = {
             "example": {"file": "binary"}
         }
+
 
 class AttachmentResponse(BaseModel):
     id: str

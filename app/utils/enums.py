@@ -31,3 +31,9 @@ class TagsSwagger(str, Enum):
     USER = "User"
     GROUP = "Group"
     TASK = "Task"
+
+
+class PriorityTask(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
